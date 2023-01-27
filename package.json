@@ -1,0 +1,14 @@
+{
+  "license": "MIT",
+  "unity": "2020.3",
+  "version": "1.0.0",
+  "author": {
+    "name": "Ikonoclast"
+  },
+  "displayName": "ClassAttributes",
+  "name": "com.ikonoclast.class-attributes",
+  "keywords": [
+    "attributes"
+  ],
+  "description": "ClassAttributes is a package containing a set of attributes that can be applied to classes and are enforced when the project loads or the hierarchy changes."
+}
