@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - editor window for configuring class attribute enforcers
 
+## [1.0.1]
+
+## Changed
+
+- copyright holder
+- package author
+
 ## [1.0.0]
 
 ### Added
