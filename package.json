@@ -1,7 +1,7 @@
 {
   "license": "MIT",
   "unity": "2020.3",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "author": {
     "name": "Jubessin",
     "url": "https://github.com/Jubessin"
@@ -11,5 +11,8 @@
   "keywords": [
     "attributes"
   ],
-  "description": "ClassAttributes is a package containing a set of attributes that can be applied to classes and are enforced when the project loads or the hierarchy changes."
+  "description": "Unity package used in the development of Ikonoclast projects, containing a set of attributes that can be configured, applied to classes, and enforced when the project loads or the hierarchy changes.",
+  "dependencies": {
+    "com.ikonoclast.common": "2.1.0"
+  }
 }

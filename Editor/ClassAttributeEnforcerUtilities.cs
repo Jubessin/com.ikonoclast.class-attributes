@@ -1,19 +1,33 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using Newtonsoft.Json;
 using System.Reflection;
 using System.Collections.Generic;
 
+using UnityObject = UnityEngine.Object;
+
 namespace Ikonoclast.ClassAttributes.Editor
 {
-    using UnityObject = UnityEngine.Object;
+    using Common;
+    using Common.Editor;
 
+    using static Common.Editor.PanelUtils;
+    using static Common.Editor.CustomEditorHelper;
+
+    /// <summary>
+    /// This class provides useful functionality regarding <see cref="IClassAttributeEnforcer"/> classes.
+    /// </summary>
     public static class ClassAttributeEnforcerUtilities
     {
+        #region Inner
+
         public static class UndoGroupNames
         {
             public const string
+                Drag = "Drag",
                 AddComponent = "Add",
                 RemoveComponent = "Remove",
                 CreateGameObject = "Create",
@@ -24,6 +38,119 @@ namespace Ikonoclast.ClassAttributes.Editor
                 ClassAttributeEnforcer = nameof(ClassAttributeEnforcer);
         }
 
+        #endregion
+
+        #region Fields
+
+        private static Map enforcerConfigurations = null;
+
+        private static IReadOnlyList<IClassAttributeEnforcer>
+            _registered = null;
+
+        private static readonly List<IClassAttributeEnforcer>
+            registered = new List<IClassAttributeEnforcer>();
+
+        #endregion
+
+        #region Properties
+
+        public static bool ShouldReloadConfiguration
+        {
+            get;
+            set;
+        } = true;
+
+        public static IReadOnlyList<IClassAttributeEnforcer> Registered =>
+            _registered ?? (_registered = registered.AsReadOnly());
+
+        #endregion
+
+        #region Methods
+
+        /// <summary>
+        /// Save all registered enforcers to the configuration file.
+        /// </summary>
+        public static void SaveConfigurationFile()
+        {
+            if (enforcerConfigurations == null)
+            {
+                enforcerConfigurations = new Map("Configurations");
+            }
+
+            // Iterate over every registered enforcer and serialize its configuration.
+            foreach (var item in registered)
+            {
+                if (!(item is IEditorSaveObject saveObject))
+                    continue;
+
+                saveObject.Serialize(enforcerConfigurations, true);
+            }
+
+            var json = JsonConvert.SerializeObject(enforcerConfigurations);
+
+            File.WriteAllText
+            (
+                Path.Combine
+                (
+                    Directory.GetCurrentDirectory(),
+                    "Packages\\com.ikonoclast.class-attributes\\Editor\\.configurations.json"
+                ),
+                json
+            );
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            ShouldReloadConfiguration = false;
+        }
+
+        private static void LoadConfigurationFile()
+        {
+            if (enforcerConfigurations != null && !ShouldReloadConfiguration)
+                return;
+
+            var json = File.ReadAllText
+            (
+                Path.Combine
+                (
+                    Directory.GetCurrentDirectory(),
+                    "Packages\\com.ikonoclast.class-attributes\\Editor\\.configurations.json"
+                )
+            );
+
+            if (!string.IsNullOrEmpty(json))
+            {
+                enforcerConfigurations = JsonConvert.DeserializeObject<Map>(json);
+            }
+        }
+
+        /// <summary>
+        /// Load a configuration from the configuration file.
+        /// </summary>
+        public static T LoadConfiguration<T>(string key)
+        {
+            LoadConfigurationFile();
+
+            return enforcerConfigurations != null
+                ? (T)enforcerConfigurations.GetUnsafe(key)
+                : default;
+        }
+
+        public static void Register(IClassAttributeEnforcer enforcer)
+        {
+            if (!registered.Contains(enforcer))
+            {
+                registered.Add(enforcer);
+            }
+        }
+
+        public static void Unregister(IClassAttributeEnforcer enforcer)
+        {
+            registered.Remove(enforcer);
+        }
+
+        /// <summary>
+        /// Attempt to destroy component on <see cref="GameObject"/> during playmode or in editor.
+        /// </summary>
         public static void SafeDestroy(this GameObject gameObject, Type type)
         {
             if (gameObject == null)
@@ -44,6 +171,9 @@ namespace Ikonoclast.ClassAttributes.Editor
             Debug.LogWarning($"Removed component of type {type} from Object {gameObject}.");
         }
 
+        /// <summary>
+        /// Determines if a string contains any of the provided strings.
+        /// </summary>
         public static bool ContainsAny(this string str, params string[] strings)
         {
             if (strings == null || string.IsNullOrEmpty(str))
@@ -55,16 +185,68 @@ namespace Ikonoclast.ClassAttributes.Editor
 
             return false;
         }
+
+        #endregion
     }
 
+    /// <summary>
+    /// This class provides useful functionality specific to <see cref="IClassAttributeEnforcer"/> implementers.
+    /// </summary>
     public static class ClassAttributeEnforcerUtilities<ClassAttribute>
         where ClassAttribute : IClassAttribute
     {
+        public static readonly float BoolConfigurationHeight = (slh * 1.25f) + 2;
+
+        #region Fields
+
         // Malleable.
         private const double bufferTime = 0.25f;
 
         private static readonly Dictionary<Type, double>
             enforcerBuffer = new Dictionary<Type, double>();
+
+        #endregion
+
+        #region Methods
+
+        /// ---
+        /// Generate UI for editing a boolean config.
+        public static bool MakeBoolConfiguration(Vector2 size, bool value, string configName, ref float offsetY)
+        {
+            var configRect = new Rect
+            {
+                x = 2,
+                y = offsetY + 2,
+                width = size.x - 4,
+                height = slh * 1.25f
+            };
+
+            offsetY += configRect.height + 2;
+
+            MakeBox(configRect);
+
+            configRect.x += 5;
+            configRect.y += 1;
+
+            GUI.Label(configRect, configName, EditorStyles.boldLabel);
+
+            configRect.y += 1;
+
+            VGUILine(configRect, configRect.height - 3f, configRect.width * 0.9f);
+
+            configRect.x = configRect.width - slh;
+            configRect.y += 1;
+            configRect.width = slh;
+            configRect.height = slh;
+
+            return GUI.Toggle(configRect, value, GUIContent.none);
+        }
+
+        public static void Register(IClassAttributeEnforcer enforcer) =>
+            ClassAttributeEnforcerUtilities.Register(enforcer);
+
+        public static void Unregister(IClassAttributeEnforcer enforcer) =>
+            ClassAttributeEnforcerUtilities.Unregister(enforcer);
 
         public static void GetAllAssemblies(ref Assembly[] assemblies)
         {
@@ -101,6 +283,8 @@ namespace Ikonoclast.ClassAttributes.Editor
             if (gameObject == null)
                 return;
 
+            // On the active game object, find all components of type
+            // and, for each one that has the specified ClassAttribute, apply the attribute.
             foreach (var type in typesWithAttribute)
             {
                 if (gameObject.GetComponent(type))
@@ -117,6 +301,7 @@ namespace Ikonoclast.ClassAttributes.Editor
                 }
             }
 
+            // Update the buffer.
             enforcerBuffer[typeof(ClassAttribute)] = EditorApplication.timeSinceStartup;
         }
 
@@ -132,6 +317,7 @@ namespace Ikonoclast.ClassAttributes.Editor
                 if ((EditorApplication.timeSinceStartup - lastEnforcedTime) < bufferTime)
                     return;
 
+            // Similar logic as with the above method except across all objects of each type in the open scene(s).
             foreach (var type in typesWithAttribute)
             {
                 if (type.IsGenericTypeDefinition)
@@ -161,5 +347,7 @@ namespace Ikonoclast.ClassAttributes.Editor
 
             enforcerBuffer[typeof(ClassAttribute)] = EditorApplication.timeSinceStartup;
         }
+
+        #endregion
     }
 }

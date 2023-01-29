@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] --- 2023-01-29
+
 ### Added
 
-- editor window for configuring class attribute enforcers
+- editor window for configuring class attribute enforcers enabled state
+- added dependency to com.ikonoclast.common package, version 2.1.0
 
 ## [1.0.1]
 

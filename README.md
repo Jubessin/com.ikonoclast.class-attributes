@@ -1,12 +1,22 @@
 ClassAttributes
 
-A set of class attributes that can be assigned to components to automatically invoke editor commands when changes are made to the hierarchy or when the project loads.
+Unity package used in the development of Ikonoclast projects, containing a set of attributes that can be configured, applied to classes, and enforced when the project loads or the hierarchy changes.
 
-Editor Tooling
+## Editor Tooling
 
-Runtime Support
+- ClassAttributeEnforcerEditorWindow
+- .configurations.json
+
+## Runtime Support
+
 - RequireNameAttribute
 - RequireLayerAttribute
 - DisallowComponentAttribute
 - RequireComponentAttribute
 - RequireChildComponentAttribute
+
+## Dependencies
+
+This package has dependencies. To use this package, add the following to the manifest.json file found under Assets > Packages:
+
+* `"com.ikonoclast.common" : "https://github.com/Jubessin/com.ikonoclast.common.git"`
