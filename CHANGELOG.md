@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- configuration for enforcer logging
+
+## [2.0.1] --- 2023-01-29
+
+### Changes
+
+- address FileNotFound exception in event of missing .configuration.json file.
+
 ## [2.0.0] --- 2023-01-29
 
 ### Added
