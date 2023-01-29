@@ -108,14 +108,20 @@ namespace Ikonoclast.ClassAttributes.Editor
             if (enforcerConfigurations != null && !ShouldReloadConfiguration)
                 return;
 
-            var json = File.ReadAllText
+            string path = Path.Combine
             (
-                Path.Combine
-                (
-                    Directory.GetCurrentDirectory(),
-                    "Packages\\com.ikonoclast.class-attributes\\Editor\\.configurations.json"
-                )
+                Directory.GetCurrentDirectory(),
+                "Packages\\com.ikonoclast.class-attributes\\Editor\\.configurations.json"
             );
+
+            if (!File.Exists(path))
+            {
+                Debug.LogWarning("Could not find class attribute enforcer configuration file.");
+
+                return;
+            }
+
+            var json = File.ReadAllText(path);
 
             if (!string.IsNullOrEmpty(json))
             {
