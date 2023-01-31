@@ -19,4 +19,4 @@ Unity package used in the development of Ikonoclast projects, containing a set o
 
 This package has dependencies. To use this package, add the following to the manifest.json file found under Assets > Packages:
 
-* `"com.ikonoclast.common" : "https://github.com/Jubessin/com.ikonoclast.common.git"`
+* `"com.ikonoclast.common" : "https://github.com/Jubessin/com.ikonoclast.common.git#v2.1.0"`
