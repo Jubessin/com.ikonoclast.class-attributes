@@ -141,6 +141,27 @@ namespace Ikonoclast.ClassAttributes.Editor
                 : default;
         }
 
+        public static bool? GetEnabledState<T>() where T : IClassAttribute
+        {
+            foreach (var item in registered)
+                if (item is T)
+                    return item.Enabled;
+
+            return null;
+        }
+
+        public static void SetEnabledState<T>(bool value) where T : IClassAttribute
+        {
+            foreach (var item in registered)
+            {
+                if (item is T)
+                {
+                    item.Enabled = value;
+                    return;
+                }
+            }
+        }
+
         public static void Register(IClassAttributeEnforcer enforcer)
         {
             if (!registered.Contains(enforcer))
