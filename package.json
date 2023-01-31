@@ -1,7 +1,7 @@
 {
   "license": "MIT",
   "unity": "2020.3",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "author": {
     "name": "Jubessin",
     "url": "https://github.com/Jubessin"
@@ -13,6 +13,6 @@
   ],
   "description": "Unity package used in the development of Ikonoclast projects, containing a set of attributes that can be configured, applied to classes, and enforced when the project loads or the hierarchy changes.",
   "dependencies": {
-    "com.ikonoclast.common": "2.4.0"
+    "com.ikonoclast.common": "2.4.1"
   }
 }

@@ -29,6 +29,9 @@ namespace Ikonoclast.ClassAttributes.Editor
 
         #region Properties
 
+        public string ID =>
+            nameof(RequireComponentClassAttributeEnforcer);
+
         public static bool Enabled
         {
             get
@@ -181,9 +184,6 @@ namespace Ikonoclast.ClassAttributes.Editor
         #endregion
 
         #region IEditorSaveObject Implementations
-
-        string ISaveObject.ID =>
-            nameof(RequireComponentClassAttributeEnforcer);
 
         Map ISaveObject.Serialize()
         {
