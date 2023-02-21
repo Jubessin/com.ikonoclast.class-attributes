@@ -1,5 +1,4 @@
 ﻿using System;
-using UnityEngine;
 
 namespace Ikonoclast.ClassAttributes
 {
@@ -9,11 +8,16 @@ namespace Ikonoclast.ClassAttributes
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
     public sealed class RequireLayerAttribute : Attribute, IClassAttribute
     {
-        public int layer { get; }
+        public string layerName { get; }
+        public bool createIfNotDefined { get; }
 
-        public RequireLayerAttribute(string requiredLayerName)
+        public RequireLayerAttribute(string requiredLayerName, bool createIfNotDefined = true)
         {
-            layer = LayerMask.NameToLayer(requiredLayerName);
+            if (string.IsNullOrWhiteSpace(requiredLayerName))
+                throw new Exception($"{nameof(requiredLayerName)} must be a non-null, non-whitespace string.");
+
+            layerName = requiredLayerName;
+            this.createIfNotDefined = createIfNotDefined;
         }
     }
 }

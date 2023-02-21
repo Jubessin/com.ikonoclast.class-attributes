@@ -2,6 +2,7 @@
 
 namespace Ikonoclast.ClassAttributes
 {
+
     /// <summary>
     /// The DisallowComponent attribute automatically removes conflicting components.
     /// </summary>

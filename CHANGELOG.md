@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] --- 2023-02-21
+
 ### Added
 
-- configuration for enforcer logging
-- RequireTag class attribute
+- additional configurations for all enforcers
+- RequireTag class attribute, class attribute enforcer, and tests
+
+### Changed
+
+- RequireLayer class attribute can create layers if not defined
+- com.ikonoclast.common dependency version
+
 
 ## [2.1.1] --- 2023-01-31
 

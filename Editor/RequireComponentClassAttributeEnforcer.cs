@@ -3,11 +3,14 @@ using UnityEditor;
 using UnityEngine;
 using System.Reflection;
 using System.Collections.Generic;
+using UnityEditor.SceneManagement;
+using UnityEngine.SceneManagement;
 
 namespace Ikonoclast.ClassAttributes.Editor
 {
     using Common;
     using Common.Editor;
+
     using static ClassAttributeEnforcerUtilities.UndoGroupNames;
 
     using Utilities = ClassAttributeEnforcerUtilities<RequireComponentAttribute>;
@@ -24,6 +27,18 @@ namespace Ikonoclast.ClassAttributes.Editor
         private static bool enabled = false;
         private static Assembly[] assemblies;
         private static List<Type> typesWithAttribute;
+
+        private static bool
+            enforceOnSceneChange,
+            enforceOnSelectionChange;
+
+        private static readonly Dictionary<string, string>
+            propertyKeys = new Dictionary<string, string>()
+            {
+                { nameof(enabled), $"{nameof(RequireComponentClassAttributeEnforcer)}.{nameof(Enabled)}" },
+                { nameof(enforceOnSceneChange), $"{nameof(RequireComponentClassAttributeEnforcer)}.Enforce On Scene Change" },
+                { nameof(enforceOnSelectionChange), $"{nameof(RequireComponentClassAttributeEnforcer)}.Enforce On Selection Change" },
+            };
 
         #endregion
 
@@ -74,8 +89,7 @@ namespace Ikonoclast.ClassAttributes.Editor
         {
             Utilities.Register(this);
 
-            enabled = ClassAttributeEnforcerUtilities
-                .LoadConfiguration<bool>($"{nameof(RequireComponentClassAttributeEnforcer)}.{nameof(Enabled)}");
+            LoadConfigurations();
 
             if (enabled)
             {
@@ -105,16 +119,30 @@ namespace Ikonoclast.ClassAttributes.Editor
 
         private static void Subscribe()
         {
+            EditorSceneManager.sceneOpened += OnSceneOpened;
+            Selection.selectionChanged += OnSelectionChanged;
             EditorApplication.hierarchyChanged += OnHierarchyChanged;
-            UnityEditor.SceneManagement.EditorSceneManager.sceneOpened += OnSceneOpened;
             ClassAttributeEnforcerEditorWindow.RequestAttributeEnforcement += OnRequestAttributeEnforcement;
         }
 
         private static void Unsubscribe()
         {
+            EditorSceneManager.sceneOpened -= OnSceneOpened;
+            Selection.selectionChanged -= OnSelectionChanged;
             EditorApplication.hierarchyChanged -= OnHierarchyChanged;
-            UnityEditor.SceneManagement.EditorSceneManager.sceneOpened -= OnSceneOpened;
             ClassAttributeEnforcerEditorWindow.RequestAttributeEnforcement -= OnRequestAttributeEnforcement;
+        }
+
+        private static void LoadConfigurations()
+        {
+            enabled = ClassAttributeEnforcerUtilities
+                .LoadConfiguration<bool>(propertyKeys[nameof(enabled)]);
+
+            enforceOnSceneChange = ClassAttributeEnforcerUtilities
+                .LoadConfiguration<bool>(propertyKeys[nameof(enforceOnSceneChange)]);
+
+            enforceOnSelectionChange = ClassAttributeEnforcerUtilities
+                .LoadConfiguration<bool>(propertyKeys[nameof(enforceOnSelectionChange)]);
         }
 
         private static void OnProjectLoaded()
@@ -130,7 +158,12 @@ namespace Ikonoclast.ClassAttributes.Editor
                 return;
 
             // Only apply the attribute if the last operation had a name containing one of these strings.
-            if (!Undo.GetCurrentGroupName().ContainsAny(Drag, AddComponent, RemoveComponent, InspectorChange, ClassAttributeEnforcer))
+            if (!Undo.GetCurrentGroupName().ContainsAny(
+                Drag,
+                AddComponent,
+                RemoveComponent,
+                InspectorChange,
+                ClassAttributeEnforcer))
                 return;
 
             Utilities.ApplyAttributeToSelectedGameObject(typesWithAttribute, ApplyAttribute);
@@ -164,20 +197,31 @@ namespace Ikonoclast.ClassAttributes.Editor
             Undo.SetCurrentGroupName($"Undo $[{nameof(RequireComponentClassAttributeEnforcer)}]");
         }
 
-        private static void OnSceneOpened(UnityEngine.SceneManagement.Scene scene, UnityEditor.SceneManagement.OpenSceneMode mode)
-        {
-            OnHierarchyChanged();
-        }
-
         #endregion
 
         #region Event Listeners
+
+        private static void OnSelectionChanged()
+        {
+            if (Enabled && enforceOnSelectionChange)
+            {
+                Utilities.ApplyAttributeToSelectedGameObject(typesWithAttribute, ApplyAttribute);
+            }
+        }
 
         private static void OnRequestAttributeEnforcement()
         {
             if (Enabled)
             {
                 Utilities.ApplyAttributeToAllGameObjectsOfType(typesWithAttribute, ApplyAttribute);
+            }
+        }
+
+        private static void OnSceneOpened(Scene scene, OpenSceneMode mode)
+        {
+            if (enforceOnSceneChange)
+            {
+                OnHierarchyChanged();
             }
         }
 
@@ -189,22 +233,45 @@ namespace Ikonoclast.ClassAttributes.Editor
         {
             var map = new Map(SaveObject.ID);
 
-            map[$"{SaveObject.ID}.{nameof(Enabled)}"] = Enabled;
+            map[propertyKeys[nameof(enabled)]] = Enabled;
+            map[propertyKeys[nameof(enforceOnSceneChange)]] = enforceOnSceneChange;
+            map[propertyKeys[nameof(enforceOnSelectionChange)]] = enforceOnSelectionChange;
 
             return map;
         }
 
         void ISaveObject.Serialize(Map map, bool overwrite)
         {
-            if (!overwrite && map.HasKey($"{SaveObject.ID}.{nameof(Enabled)}"))
-                return;
+            if (overwrite)
+            {
+                map[propertyKeys[nameof(enabled)]] = Enabled;
+                map[propertyKeys[nameof(enforceOnSceneChange)]] = enforceOnSceneChange;
+                map[propertyKeys[nameof(enforceOnSelectionChange)]] = enforceOnSelectionChange;
+            }
+            else
+            {
+                if (!map.HasKey(propertyKeys[nameof(enabled)]))
+                {
+                    map[propertyKeys[nameof(enabled)]] = Enabled;
+                }
 
-            map[$"{SaveObject.ID}.{nameof(Enabled)}"] = Enabled;
+                if (!map.HasKey(propertyKeys[nameof(enforceOnSceneChange)]))
+                {
+                    map[propertyKeys[nameof(enforceOnSceneChange)]] = enforceOnSceneChange;
+                }
+
+                if (!map.HasKey(propertyKeys[nameof(enforceOnSelectionChange)]))
+                {
+                    map[propertyKeys[nameof(enforceOnSelectionChange)]] = enforceOnSelectionChange;
+                }
+            }
         }
 
-        void ISaveObject.Deserialize(Map map)
+        void ISaveObject.Deserialize(Map dict)
         {
-            Enabled = map.GetRawBoolean($"{SaveObject.ID}.{nameof(Enabled)}");
+            Enabled = dict.GetRawBoolean(propertyKeys[nameof(Enabled)]);
+            enforceOnSceneChange = dict.GetRawBoolean(propertyKeys[nameof(enforceOnSceneChange)]);
+            enforceOnSelectionChange = dict.GetRawBoolean(propertyKeys[nameof(enforceOnSelectionChange)]);
         }
 
         bool IEditorSaveObject.Enabled
@@ -216,6 +283,8 @@ namespace Ikonoclast.ClassAttributes.Editor
         void IEditorSaveObject.Reset()
         {
             Enabled = true;
+            enforceOnSceneChange = true;
+            enforceOnSelectionChange = true;
         }
 
         #endregion
@@ -223,15 +292,40 @@ namespace Ikonoclast.ClassAttributes.Editor
         #region IClassAttributeEnforcer Implementations
 
         float IClassAttributeEnforcer.ConfigurationViewHeight =>
-            Utilities.BoolConfigurationHeight;
+            Utilities.BoolConfigurationHeight * 3;
 
         void IClassAttributeEnforcer.OnConfigurationGUI(Vector2 size)
         {
             float offsetY = 0;
 
-            Enabled = Utilities.MakeBoolConfiguration(size, Enabled, nameof(Enabled), ref offsetY);
-        }
+            Enabled = Utilities.MakeBoolConfiguration
+            (
+                size,
+                Enabled,
+                nameof(Enabled),
+                ref offsetY
+            );
 
+            EditorGUI.BeginDisabledGroup(!Enabled);
+
+            enforceOnSceneChange = Utilities.MakeBoolConfiguration
+            (
+                size,
+                enforceOnSceneChange,
+                "Enforce On Scene Change",
+                ref offsetY
+            );
+
+            enforceOnSelectionChange = Utilities.MakeBoolConfiguration
+            (
+                size,
+                enforceOnSelectionChange,
+                "Enforce On Selection Change",
+                ref offsetY
+            );
+
+            EditorGUI.EndDisabledGroup();
+        }
 
         #endregion
     }
