@@ -3,11 +3,16 @@ using UnityEditor;
 using UnityEngine;
 using System.Reflection;
 using System.Collections.Generic;
+using UnityEditor.SceneManagement;
+using UnityEngine.SceneManagement;
+
+using UnityObject = UnityEngine.Object;
 
 namespace Ikonoclast.ClassAttributes.Editor
 {
     using Common;
     using Common.Editor;
+
     using static ClassAttributeEnforcerUtilities.UndoGroupNames;
 
     using Utilities = ClassAttributeEnforcerUtilities<RequireLayerAttribute>;
@@ -20,6 +25,18 @@ namespace Ikonoclast.ClassAttributes.Editor
         private static bool enabled = false;
         private static Assembly[] assemblies;
         private static List<Type> typesWithAttribute;
+
+        private static bool
+            enforceOnSceneChange,
+            enforceOnSelectionChange;
+
+        private static readonly Dictionary<string, string>
+            propertyKeys = new Dictionary<string, string>()
+            {
+                { nameof(enabled), $"{nameof(RequireLayerClassAttributeEnforcer)}.{nameof(Enabled)}" },
+                { nameof(enforceOnSceneChange), $"{nameof(RequireLayerClassAttributeEnforcer)}.Enforce On Scene Change" },
+                { nameof(enforceOnSelectionChange), $"{nameof(RequireLayerClassAttributeEnforcer)}.Enforce On Selection Change" },
+            };
 
         #endregion
 
@@ -70,8 +87,7 @@ namespace Ikonoclast.ClassAttributes.Editor
         {
             Utilities.Register(this);
 
-            enabled = ClassAttributeEnforcerUtilities
-                .LoadConfiguration<bool>($"{nameof(RequireLayerClassAttributeEnforcer)}.{nameof(Enabled)}");
+            LoadConfigurations();
 
             if (enabled)
             {
@@ -101,16 +117,30 @@ namespace Ikonoclast.ClassAttributes.Editor
 
         private static void Subscribe()
         {
+            EditorSceneManager.sceneOpened += OnSceneOpened;
+            Selection.selectionChanged += OnSelectionChanged;
             EditorApplication.hierarchyChanged += OnHierarchyChanged;
-            UnityEditor.SceneManagement.EditorSceneManager.sceneOpened += OnSceneOpened;
             ClassAttributeEnforcerEditorWindow.RequestAttributeEnforcement += OnRequestAttributeEnforcement;
         }
 
         private static void Unsubscribe()
         {
+            EditorSceneManager.sceneOpened -= OnSceneOpened;
+            Selection.selectionChanged -= OnSelectionChanged;
             EditorApplication.hierarchyChanged -= OnHierarchyChanged;
-            UnityEditor.SceneManagement.EditorSceneManager.sceneOpened -= OnSceneOpened;
             ClassAttributeEnforcerEditorWindow.RequestAttributeEnforcement -= OnRequestAttributeEnforcement;
+        }
+
+        private static void LoadConfigurations()
+        {
+            enabled = ClassAttributeEnforcerUtilities
+                .LoadConfiguration<bool>(propertyKeys[nameof(enabled)]);
+
+            enforceOnSceneChange = ClassAttributeEnforcerUtilities
+                .LoadConfiguration<bool>(propertyKeys[nameof(enforceOnSceneChange)]);
+
+            enforceOnSelectionChange = ClassAttributeEnforcerUtilities
+                .LoadConfiguration<bool>(propertyKeys[nameof(enforceOnSelectionChange)]);
         }
 
         private static void OnProjectLoaded()
@@ -130,9 +160,9 @@ namespace Ikonoclast.ClassAttributes.Editor
                 Drag,
                 LayerChange,
                 AddComponent,
+                InspectorChange,
                 RemoveComponent,
                 ClassAttributeEnforcer,
-                InspectorChange,
                 CinemachinePipelineCreated))
                 return;
 
@@ -144,26 +174,106 @@ namespace Ikonoclast.ClassAttributes.Editor
             if (!(attribute is RequireLayerAttribute attr))
                 return;
 
-            gameObject.layer = attr.layer;
+            if (gameObject.layer == LayerMask.NameToLayer(attr.layerName))
+                return;
 
-            // Set the undo group name to avoid repeated enforcements.
-            Undo.SetCurrentGroupName($"Undo $[{nameof(RequireLayerClassAttributeEnforcer)}]");
-        }
+            var asset = AssetDatabase.LoadAssetAtPath<UnityObject>("ProjectSettings/TagManager.asset");
 
-        private static void OnSceneOpened(UnityEngine.SceneManagement.Scene scene, UnityEditor.SceneManagement.OpenSceneMode mode)
-        {
-            OnHierarchyChanged();
+            var tagManagerObject = new SerializedObject(asset);
+
+            var layers = tagManagerObject.FindProperty("layers");
+
+            if (layers == null)
+            {
+                Debug.LogError("Could not find 'layers' property in TagManager.");
+
+                return;
+            }
+
+            if (!layers.isArray)
+            {
+                Debug.LogError("'layers' property in TagManager is not an array.");
+
+                return;
+            }
+
+            int? idx = null;
+            var prop = layers.GetArrayElementAtIndex(0);
+
+            for (int i = 0; prop.propertyType == SerializedPropertyType.String; ++i)
+            {
+                if (prop.stringValue == attr.layerName)
+                {
+                    gameObject.layer = LayerMask.NameToLayer(attr.layerName);
+
+                    // Set the undo group name to avoid repeated enforcements.
+                    Undo.SetCurrentGroupName($"Undo $[{nameof(RequireLayerClassAttributeEnforcer)}]");
+
+                    return;
+                }
+
+                if (!idx.HasValue && string.IsNullOrWhiteSpace(prop.stringValue))
+                {
+                    idx = i;
+                }
+
+                prop.Next(false);
+            }
+
+            if (attr.createIfNotDefined)
+            {
+                prop = layers.GetArrayElementAtIndex(idx.GetValueOrDefault());
+
+                if (string.IsNullOrWhiteSpace(prop.stringValue))
+                {
+                    prop.stringValue = attr.layerName;
+
+                    tagManagerObject.ApplyModifiedPropertiesWithoutUndo();
+
+                    gameObject.layer = LayerMask.NameToLayer(attr.layerName);
+
+                    Debug.Log($"{attr.layerName} was created and applied to {gameObject}.");
+
+                    // Set the undo group name to avoid repeated enforcements.
+                    Undo.SetCurrentGroupName($"Undo $[{nameof(RequireLayerClassAttributeEnforcer)}]");
+
+                    return;
+                }
+
+                Debug.LogWarning(
+                    $"{attr.layerName} could not be created or applied to {gameObject}. " +
+                        $"There may be no available layers [0...31].");
+            }
+
+            Debug.LogWarning(
+                $"{attr.layerName} is not defined, and was not created or applied to {gameObject}.");
         }
 
         #endregion
 
         #region Event Listeners
 
+        private static void OnSelectionChanged()
+        {
+            if (Enabled && enforceOnSelectionChange)
+            {
+                Utilities.ApplyAttributeToSelectedGameObject(typesWithAttribute, ApplyAttribute);
+            }
+        }
+
         private static void OnRequestAttributeEnforcement()
         {
             if (Enabled)
             {
                 Utilities.ApplyAttributeToAllGameObjectsOfType(typesWithAttribute, ApplyAttribute);
+            }
+        }
+
+        private static void OnSceneOpened(Scene scene, OpenSceneMode mode)
+        {
+            if (enforceOnSceneChange)
+            {
+                OnHierarchyChanged();
             }
         }
 
@@ -175,22 +285,45 @@ namespace Ikonoclast.ClassAttributes.Editor
         {
             var map = new Map(SaveObject.ID);
 
-            map[$"{SaveObject.ID}.{nameof(Enabled)}"] = Enabled;
+            map[propertyKeys[nameof(enabled)]] = Enabled;
+            map[propertyKeys[nameof(enforceOnSceneChange)]] = enforceOnSceneChange;
+            map[propertyKeys[nameof(enforceOnSelectionChange)]] = enforceOnSelectionChange;
 
             return map;
         }
 
         void ISaveObject.Serialize(Map map, bool overwrite)
         {
-            if (!overwrite && map.HasKey($"{SaveObject.ID}.{nameof(Enabled)}"))
-                return;
+            if (overwrite)
+            {
+                map[propertyKeys[nameof(enabled)]] = Enabled;
+                map[propertyKeys[nameof(enforceOnSceneChange)]] = enforceOnSceneChange;
+                map[propertyKeys[nameof(enforceOnSelectionChange)]] = enforceOnSelectionChange;
+            }
+            else
+            {
+                if (!map.HasKey(propertyKeys[nameof(enabled)]))
+                {
+                    map[propertyKeys[nameof(enabled)]] = Enabled;
+                }
 
-            map[$"{SaveObject.ID}.{nameof(Enabled)}"] = Enabled;
+                if (!map.HasKey(propertyKeys[nameof(enforceOnSceneChange)]))
+                {
+                    map[propertyKeys[nameof(enforceOnSceneChange)]] = enforceOnSceneChange;
+                }
+
+                if (!map.HasKey(propertyKeys[nameof(enforceOnSelectionChange)]))
+                {
+                    map[propertyKeys[nameof(enforceOnSelectionChange)]] = enforceOnSelectionChange;
+                }
+            }
         }
 
         void ISaveObject.Deserialize(Map dict)
         {
-            Enabled = dict.GetRawBoolean($"{SaveObject.ID}.{nameof(Enabled)}");
+            Enabled = dict.GetRawBoolean(propertyKeys[nameof(Enabled)]);
+            enforceOnSceneChange = dict.GetRawBoolean(propertyKeys[nameof(enforceOnSceneChange)]);
+            enforceOnSelectionChange = dict.GetRawBoolean(propertyKeys[nameof(enforceOnSelectionChange)]);
         }
 
         bool IEditorSaveObject.Enabled
@@ -202,6 +335,8 @@ namespace Ikonoclast.ClassAttributes.Editor
         void IEditorSaveObject.Reset()
         {
             Enabled = true;
+            enforceOnSceneChange = true;
+            enforceOnSelectionChange = true;
         }
 
         #endregion
@@ -209,13 +344,39 @@ namespace Ikonoclast.ClassAttributes.Editor
         #region IClassAttributeEnforcer Implementations
 
         float IClassAttributeEnforcer.ConfigurationViewHeight =>
-            Utilities.BoolConfigurationHeight;
+            Utilities.BoolConfigurationHeight * 3;
 
         void IClassAttributeEnforcer.OnConfigurationGUI(Vector2 size)
         {
             float offsetY = 0;
 
-            Enabled = Utilities.MakeBoolConfiguration(size, Enabled, nameof(Enabled), ref offsetY);
+            Enabled = Utilities.MakeBoolConfiguration
+            (
+                size,
+                Enabled,
+                nameof(Enabled),
+                ref offsetY
+            );
+
+            EditorGUI.BeginDisabledGroup(!Enabled);
+
+            enforceOnSceneChange = Utilities.MakeBoolConfiguration
+            (
+                size,
+                enforceOnSceneChange,
+                "Enforce On Scene Change",
+                ref offsetY
+            );
+
+            enforceOnSelectionChange = Utilities.MakeBoolConfiguration
+            (
+                size,
+                enforceOnSelectionChange,
+                "Enforce On Selection Change",
+                ref offsetY
+            );
+
+            EditorGUI.EndDisabledGroup();
         }
 
         #endregion

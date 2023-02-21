@@ -137,7 +137,7 @@ namespace Ikonoclast.ClassAttributes.Editor
             LoadConfigurationFile();
 
             return enforcerConfigurations != null
-                ? (T)enforcerConfigurations.GetUnsafe(key)
+                ? enforcerConfigurations.Get<T>(key)
                 : default;
         }
 
