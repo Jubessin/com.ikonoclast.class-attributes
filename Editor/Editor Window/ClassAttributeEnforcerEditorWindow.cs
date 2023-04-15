@@ -15,6 +15,10 @@ namespace Ikonoclast.ClassAttributes.Editor
     {
         #region Fields
 
+        private int?
+            selectionWindowID,
+            configurationWindowID;
+
         private Panel
             panel1,
             panel2;
@@ -127,11 +131,17 @@ namespace Ikonoclast.ClassAttributes.Editor
 
         private void OnGUI()
         {
-            HandleEvent();
+            HandleEvent(out bool close);
+
+            if (close)
+                return;
+
             HandleWindow();
 
-            void HandleEvent()
+            void HandleEvent(out bool close)
             {
+                close = false;
+
                 var evt = Event.current;
 
                 if (evt == null)
@@ -143,6 +153,8 @@ namespace Ikonoclast.ClassAttributes.Editor
                 if (evt.keyCode == KeyCode.Escape)
                 {
                     Close();
+
+                    close = true;
                 }
             }
             void HandleWindow()
@@ -153,8 +165,19 @@ namespace Ikonoclast.ClassAttributes.Editor
                 BeginWindows();
 
                 // Invoke OnPanelGUI on both panels, supplying the rect that will serve as their bounds.
-                GUI.Window(1, panel1WindowRect, (_) => panel1.OnPanelGUI(panel1Size), "", EditorStyles.inspectorDefaultMargins);
-                GUI.Window(2, panel2WindowRect, (_) => panel2.OnPanelGUI(panel2Size), "", EditorStyles.inspectorDefaultMargins);
+                GUI.Window(
+                    selectionWindowID ??= GenerateUniqueSessionID(),
+                    panel1WindowRect,
+                    (_) => panel1.OnPanelGUI(panel1Size),
+                    "",
+                    EditorStyles.inspectorDefaultMargins);
+
+                GUI.Window(
+                    configurationWindowID ??= GenerateUniqueSessionID(),
+                    panel2WindowRect,
+                    (_) => panel2.OnPanelGUI(panel2Size),
+                    "",
+                    EditorStyles.inspectorDefaultMargins);
 
                 EndWindows();
 
