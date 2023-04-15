@@ -169,6 +169,15 @@ namespace Ikonoclast.ClassAttributes.Editor
             Utilities.ApplyAttributeToSelectedGameObject(typesWithAttribute, ApplyAttribute);
         }
 
+        private static bool IsBuiltIn(string tag) =>
+            tag == "Untagged" ||
+            tag == "Respawn" ||
+            tag == "Finish" ||
+            tag == "EditorOnly" ||
+            tag == "MainCamera" ||
+            tag == "Player" ||
+            tag == "GameController";
+
         private static void ApplyAttribute(GameObject gameObject, Attribute attribute)
         {
             if (!(attribute is RequireTagAttribute attr))
@@ -176,6 +185,13 @@ namespace Ikonoclast.ClassAttributes.Editor
 
             if (gameObject.tag == attr.tag)
                 return;
+
+            if (IsBuiltIn(attr.tag))
+            {
+                gameObject.tag = attr.tag;
+
+                return;
+            }
 
             var asset = AssetDatabase.LoadAssetAtPath<UnityObject>("ProjectSettings/TagManager.asset");
 

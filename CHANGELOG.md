@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.1] --- 2023-04-15
+
+### Changed
+
+- RequireTag enforcer now checks if tag is built-in
+- added additional test for require tag attribute
+- address issue with closing editor window using 'ESC' key
+- address issue with editor window throwing error after compiling changes
+- update package dependencies
+
 ## [2.2.0] --- 2023-02-21
 
 ### Added
