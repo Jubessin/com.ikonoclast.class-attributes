@@ -20,6 +20,7 @@ namespace Ikonoclast.ClassAttributes.Editor
     {
         #region Fields
 
+        private static bool isSubscribed;
         private static bool enabled = false;
         private static Assembly[] assemblies;
         private static List<Type> typesWithAttribute;
@@ -83,6 +84,8 @@ namespace Ikonoclast.ClassAttributes.Editor
 
         public RequireNameClassAttributeEnforcer()
         {
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+
             Utilities.Register(this);
 
             LoadConfigurations();
@@ -104,6 +107,8 @@ namespace Ikonoclast.ClassAttributes.Editor
 
         ~RequireNameClassAttributeEnforcer()
         {
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+
             Utilities.Unregister(this);
 
             Unsubscribe();
@@ -115,10 +120,15 @@ namespace Ikonoclast.ClassAttributes.Editor
 
         private static void Subscribe()
         {
+            if (isSubscribed)
+                return;
+
             EditorSceneManager.sceneOpened += OnSceneOpened;
             Selection.selectionChanged += OnSelectionChanged;
             EditorApplication.hierarchyChanged += OnHierarchyChanged;
             ClassAttributeEnforcerEditorWindow.RequestAttributeEnforcement += OnRequestAttributeEnforcement;
+
+            isSubscribed = true;
         }
 
         private static void Unsubscribe()
@@ -127,6 +137,8 @@ namespace Ikonoclast.ClassAttributes.Editor
             Selection.selectionChanged -= OnSelectionChanged;
             EditorApplication.hierarchyChanged -= OnHierarchyChanged;
             ClassAttributeEnforcerEditorWindow.RequestAttributeEnforcement -= OnRequestAttributeEnforcement;
+
+            isSubscribed = false;
         }
 
         private static void OnProjectLoaded()
@@ -201,6 +213,15 @@ namespace Ikonoclast.ClassAttributes.Editor
             if (enforceOnSceneChange)
             {
                 OnHierarchyChanged();
+            }
+        }
+
+        private static void OnPlayModeStateChanged(PlayModeStateChange playModeStateChange)
+        {
+            switch (playModeStateChange)
+            {
+                case PlayModeStateChange.EnteredEditMode: Subscribe(); break;
+                case PlayModeStateChange.EnteredPlayMode: Unsubscribe(); break;
             }
         }
 
